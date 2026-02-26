@@ -2,7 +2,7 @@
 
 One package. Full stack. No corporate middleman.
 
-    pip install sovereign-agent
+    pip install sksovereign-agent
 
 This SDK re-exports the key APIs from the sovereign stack:
 - CapAuth: PGP identity, challenge-response auth, capability tokens
@@ -12,7 +12,7 @@ This SDK re-exports the key APIs from the sovereign stack:
 - Cloud 9: emotional continuity protocol
 
 Quick start:
-    from sovereign_agent import Agent
+    from sksovereign_agent import Agent
     agent = Agent("MyAgent")
     agent.init()
     agent.send("peer@mesh", "Hello from the sovereign side!")

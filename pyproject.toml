@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sovereign-agent"
+name = "sksovereign-agent"
 version = "0.1.0"
 description = "Sovereign Agent SDK — one package to build AI agents with CapAuth identity, SKMemory persistence, SKChat messaging, and SKComm transport"
 readme = "README.md"
@@ -44,7 +44,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://smilintux.org"
-Repository = "https://github.com/smilinTux/sovereign-agent"
+Repository = "https://github.com/smilinTux/sksovereign-agent"
 
 [tool.setuptools.packages.find]
 where = ["src"]

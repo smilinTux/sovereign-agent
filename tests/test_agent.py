@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from sovereign_agent.agent import Agent
+from sksovereign_agent.agent import Agent
 
 
 class TestAgentInit:
@@ -31,7 +31,10 @@ class TestAgentInit:
         """Init works even when capauth is not importable."""
         agent = Agent("TestBot", home=str(tmp_path / "agent"))
 
-        with patch.dict("sys.modules", {"capauth": None, "capauth.profile": None, "capauth.models": None}):
+        with patch.dict(
+            "sys.modules",
+            {"capauth": None, "capauth.profile": None, "capauth.models": None},
+        ):
             result = agent.init()
 
         assert result["name"] == "TestBot"
