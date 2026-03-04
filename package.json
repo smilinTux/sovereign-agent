@@ -1,0 +1,27 @@
+{
+  "name": "@smilintux/sksovereign-agent",
+  "version": "0.2.0",
+  "description": "SKSovereign Agent SDK - Build sovereign AI agents with CapAuth identity, SKMemory persistence, SKChat messaging, and SKComm transport.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "keywords": [
+    "sksovereign-agent",
+    "agent",
+    "sdk",
+    "sovereign",
+    "ai-agent",
+    "capauth",
+    "skmemory",
+    "skchat"
+  ],
+  "author": "smilinTux <chefboyrdave2.1@gmail.com>",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smilinTux/sksovereign-agent.git"
+  },
+  "homepage": "https://github.com/smilinTux/sksovereign-agent",
+  "bugs": {
+    "url": "https://github.com/smilinTux/sksovereign-agent/issues"
+  }
+}
