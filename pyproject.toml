@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sksovereign-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "Sovereign Agent SDK — one package to build AI agents with CapAuth identity, SKMemory persistence, SKChat messaging, and SKComm transport"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 authors = [
-    {name = "smilinTux", email = "admin@smilintux.org"},
+    {name = "smilinTux.org", email = "hello@smilintux.org"},
 ]
 keywords = ["ai", "agent", "sovereign", "identity", "pgp", "p2p", "memory", "chat"]
 classifiers = [
@@ -19,6 +19,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -28,30 +29,32 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "pydantic>=2.0",
-    "PGPy>=0.6",
-    "pyyaml>=6.0",
-    "click>=8.1",
-    "rich>=13.0",
+    "pydantic>=2.0,<3.0",
+    "PGPy>=0.6,<1.0",
+    "pyyaml>=6.0,<7.0",
+    "click>=8.1,<9.0",
+    "rich>=13.0,<14.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
-    "black>=24.0",
+    "black>=23.0",
+    "ruff>=0.1",
 ]
 
 [project.urls]
 Homepage = "https://smilintux.org"
 Repository = "https://github.com/smilinTux/sksovereign-agent"
+Issues = "https://github.com/smilinTux/sksovereign-agent/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.black]
 line-length = 99
-target-version = ["py311"]
+target-version = ["py310"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

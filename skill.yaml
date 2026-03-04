@@ -1,0 +1,22 @@
+name: sksovereign-agent
+version: "0.1.0"
+description: >
+  Sovereign AI agent scaffold and quick-start framework. Provides the
+  minimal scaffolding for deploying a sovereign agent with identity,
+  memory, and communication capabilities.
+
+author:
+  name: smilinTux.org
+  email: hello@smilintux.org
+
+tags: [agent, scaffold, sovereign, quickstart, framework]
+category: core
+
+tools:
+  - name: agent_quick_start
+    description: Bootstrap a new sovereign agent with default configuration
+    entrypoint: sksovereign_agent.skill:quick_start
+
+  - name: agent_status
+    description: Check the health and status of a sovereign agent deployment
+    entrypoint: sksovereign_agent.skill:status

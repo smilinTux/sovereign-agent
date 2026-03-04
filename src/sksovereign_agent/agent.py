@@ -38,6 +38,7 @@ class Agent:
         self._identity: Optional[dict] = None
         self._memory_store: Any = None
         self._history: Any = None
+        self._soul_manager: Any = None
         self._initialized = False
 
     def init(
@@ -272,6 +273,203 @@ class Agent:
         except ImportError:
             return []
 
+    # ------------------------------------------------------------------
+    # Soul operations
+    # ------------------------------------------------------------------
+
+    def load_soul(self, name: str, reason: str = "") -> Optional[dict]:
+        """Load a soul overlay by name.
+
+        Activates a previously installed soul blueprint, changing the
+        agent's personality without changing its identity.
+
+        Args:
+            name: Soul slug name (e.g. "the-developer").
+            reason: Why the soul is being loaded.
+
+        Returns:
+            Optional[dict]: Soul state dict, or None if skcapstone unavailable.
+        """
+        mgr = self._get_soul_manager()
+        if mgr is None:
+            return None
+        try:
+            state = mgr.load(name, reason=reason)
+            return state.model_dump()
+        except ValueError as exc:
+            logger.warning("Failed to load soul '%s': %s", name, exc)
+            return None
+
+    def unload_soul(self, reason: str = "") -> Optional[dict]:
+        """Unload the active soul overlay, returning to base.
+
+        Args:
+            reason: Why the soul is being unloaded.
+
+        Returns:
+            Optional[dict]: Updated soul state, or None.
+        """
+        mgr = self._get_soul_manager()
+        if mgr is None:
+            return None
+        state = mgr.unload(reason=reason)
+        return state.model_dump()
+
+    def install_soul(self, path: str) -> Optional[dict]:
+        """Install a soul blueprint from a file.
+
+        Args:
+            path: Path to .md, .yaml, or .yml blueprint file.
+
+        Returns:
+            Optional[dict]: Installed soul blueprint info, or None.
+        """
+        mgr = self._get_soul_manager()
+        if mgr is None:
+            return None
+        try:
+            bp = mgr.install(Path(path))
+            return {
+                "name": bp.name,
+                "display_name": bp.display_name,
+                "category": bp.category,
+                "traits": len(bp.core_traits),
+            }
+        except (ValueError, FileNotFoundError) as exc:
+            logger.warning("Failed to install soul from %s: %s", path, exc)
+            return None
+
+    def list_souls(self) -> list[str]:
+        """List installed soul names.
+
+        Returns:
+            list[str]: Sorted list of installed soul slug names.
+        """
+        mgr = self._get_soul_manager()
+        if mgr is None:
+            return []
+        return mgr.list_installed()
+
+    def active_soul(self) -> Optional[str]:
+        """Get the currently active soul overlay name.
+
+        Returns:
+            Optional[str]: Soul name, or None if at base.
+        """
+        mgr = self._get_soul_manager()
+        if mgr is None:
+            return None
+        return mgr.get_active_soul_name()
+
+    # ------------------------------------------------------------------
+    # Encryption operations
+    # ------------------------------------------------------------------
+
+    def encrypt(self, plaintext: str, recipient_fingerprint: str) -> Optional[str]:
+        """Encrypt a message for a recipient using their PGP public key.
+
+        Args:
+            plaintext: The message to encrypt.
+            recipient_fingerprint: PGP fingerprint of the recipient.
+
+        Returns:
+            Optional[str]: PGP-encrypted message armor, or None on failure.
+        """
+        try:
+            from capauth.crypto import get_backend
+
+            backend = get_backend()
+            capauth_dir = self.home / "capauth"
+            pub_key = backend.load_public_key(capauth_dir, recipient_fingerprint)
+            if pub_key is None:
+                logger.warning("Public key not found for %s", recipient_fingerprint)
+                return None
+            return backend.encrypt(plaintext.encode("utf-8"), pub_key)
+        except ImportError:
+            logger.warning("capauth not installed — cannot encrypt")
+            return None
+        except Exception as exc:
+            logger.warning("Encryption failed: %s", exc)
+            return None
+
+    def decrypt(self, ciphertext: str, passphrase: str = "") -> Optional[str]:
+        """Decrypt a PGP-encrypted message using the agent's private key.
+
+        Args:
+            ciphertext: PGP-encrypted armor string.
+            passphrase: Passphrase to unlock the private key.
+
+        Returns:
+            Optional[str]: Decrypted plaintext, or None on failure.
+        """
+        try:
+            from capauth.crypto import get_backend
+
+            backend = get_backend()
+            capauth_dir = self.home / "capauth"
+            priv_key = backend.load_private_key(capauth_dir, passphrase=passphrase)
+            if priv_key is None:
+                logger.warning("Private key not found or passphrase incorrect")
+                return None
+            raw = backend.decrypt(ciphertext, priv_key)
+            return raw.decode("utf-8") if isinstance(raw, bytes) else raw
+        except ImportError:
+            logger.warning("capauth not installed — cannot decrypt")
+            return None
+        except Exception as exc:
+            logger.warning("Decryption failed: %s", exc)
+            return None
+
+    def sign(self, data: str) -> Optional[str]:
+        """Sign data with the agent's PGP private key.
+
+        Args:
+            data: The data to sign.
+
+        Returns:
+            Optional[str]: PGP signature armor, or None.
+        """
+        try:
+            from capauth.crypto import get_backend
+
+            backend = get_backend()
+            capauth_dir = self.home / "capauth"
+            priv_key = backend.load_private_key(capauth_dir)
+            if priv_key is None:
+                return None
+            return backend.sign(data.encode("utf-8"), priv_key)
+        except (ImportError, Exception) as exc:
+            logger.warning("Signing failed: %s", exc)
+            return None
+
+    def verify(self, data: str, signature: str, signer_fingerprint: str) -> bool:
+        """Verify a PGP signature.
+
+        Args:
+            data: The original data that was signed.
+            signature: PGP signature armor.
+            signer_fingerprint: Expected signer's PGP fingerprint.
+
+        Returns:
+            bool: True if signature is valid.
+        """
+        try:
+            from capauth.crypto import get_backend
+
+            backend = get_backend()
+            capauth_dir = self.home / "capauth"
+            pub_key = backend.load_public_key(capauth_dir, signer_fingerprint)
+            if pub_key is None:
+                return False
+            return backend.verify(data.encode("utf-8"), signature, pub_key)
+        except (ImportError, Exception) as exc:
+            logger.warning("Verification failed: %s", exc)
+            return False
+
+    # ------------------------------------------------------------------
+    # Status
+    # ------------------------------------------------------------------
+
     def status(self) -> dict:
         """Get the agent's current status.
 
@@ -282,7 +480,7 @@ class Agent:
             "name": self.name,
             "home": str(self.home),
             "initialized": self._initialized,
-            "version": "0.1.0",
+            "version": "0.2.0",
         }
 
         if self._identity:
@@ -300,6 +498,9 @@ class Agent:
                 s["memory"] = "error"
         else:
             s["memory"] = "unavailable"
+
+        soul = self.active_soul()
+        s["soul"] = soul or "base"
 
         return s
 
@@ -343,5 +544,22 @@ class Agent:
 
             self._history = ChatHistory(store=store)
             return self._history
+        except ImportError:
+            return None
+
+    def _get_soul_manager(self) -> Any:
+        """Get or create the SoulManager.
+
+        Returns:
+            SoulManager or None.
+        """
+        if self._soul_manager is not None:
+            return self._soul_manager
+
+        try:
+            from skcapstone.soul import SoulManager
+
+            self._soul_manager = SoulManager(self.home)
+            return self._soul_manager
         except ImportError:
             return None

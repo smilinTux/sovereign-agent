@@ -1,4 +1,14 @@
-"""Tests for the Sovereign Agent SDK."""
+"""Tests for the Sovereign Agent SDK.
+
+Covers:
+- Agent creation and initialization
+- Memory operations (remember, recall)
+- Messaging (send, receive)
+- Soul operations (install, load, unload, list)
+- Status reporting
+- Agent properties
+- Encryption stubs (graceful degradation)
+"""
 
 from __future__ import annotations
 
@@ -119,7 +129,7 @@ class TestAgentStatus:
     def test_status_version(self) -> None:
         """Status includes version."""
         agent = Agent("TestBot")
-        assert agent.status()["version"] == "0.1.0"
+        assert agent.status()["version"] == "0.2.0"
 
 
 class TestAgentProperties:
@@ -134,3 +144,171 @@ class TestAgentProperties:
         """Identity is None before init."""
         agent = Agent("TestBot")
         assert agent.identity is None
+
+
+# ---------------------------------------------------------------------------
+# Soul operations
+# ---------------------------------------------------------------------------
+
+
+class TestAgentSoul:
+    """Tests for soul overlay operations."""
+
+    def _make_soul_blueprint(self, tmp_path: Path, name: str = "test-soul") -> Path:
+        """Create a minimal YAML soul blueprint file."""
+        content = f"name: {name}\ndisplay_name: Test Soul\ncategory: test\n"
+        bp_path = tmp_path / f"{name}.yaml"
+        bp_path.write_text(content)
+        return bp_path
+
+    def test_install_soul(self, tmp_path: Path) -> None:
+        """Install a soul blueprint via the agent."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+        bp_path = self._make_soul_blueprint(tmp_path)
+
+        result = agent.install_soul(str(bp_path))
+        assert result is not None
+        assert result["name"] == "test-soul"
+        assert result["category"] == "test"
+
+    def test_list_souls(self, tmp_path: Path) -> None:
+        """List installed souls."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+
+        bp1 = self._make_soul_blueprint(tmp_path, "soul-alpha")
+        bp2 = self._make_soul_blueprint(tmp_path, "soul-beta")
+        agent.install_soul(str(bp1))
+        agent.install_soul(str(bp2))
+
+        names = agent.list_souls()
+        assert "soul-alpha" in names
+        assert "soul-beta" in names
+
+    def test_load_and_unload_soul(self, tmp_path: Path) -> None:
+        """Load and unload a soul overlay."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+        bp_path = self._make_soul_blueprint(tmp_path)
+        agent.install_soul(str(bp_path))
+
+        state = agent.load_soul("test-soul", reason="testing")
+        assert state is not None
+        assert state["active_soul"] == "test-soul"
+        assert agent.active_soul() == "test-soul"
+
+        state = agent.unload_soul(reason="done testing")
+        assert state is not None
+        assert state["active_soul"] is None
+        assert agent.active_soul() is None
+
+    def test_load_uninstalled_soul_returns_none(self, tmp_path: Path) -> None:
+        """Loading an uninstalled soul returns None."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+        result = agent.load_soul("nonexistent")
+        assert result is None
+
+    def test_install_invalid_soul_returns_none(self, tmp_path: Path) -> None:
+        """Installing from a bad path returns None."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+        result = agent.install_soul(str(tmp_path / "nope.yaml"))
+        assert result is None
+
+    def test_active_soul_default_is_none(self, tmp_path: Path) -> None:
+        """Active soul is None when no overlay is loaded."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+        assert agent.active_soul() is None
+
+    def test_status_includes_soul(self, tmp_path: Path) -> None:
+        """Status dict includes the active soul."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+        bp_path = self._make_soul_blueprint(tmp_path)
+        agent.install_soul(str(bp_path))
+        agent.load_soul("test-soul")
+
+        status = agent.status()
+        assert status["soul"] == "test-soul"
+
+    def test_status_soul_base_when_none(self, tmp_path: Path) -> None:
+        """Status shows 'base' when no soul overlay is active."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+        status = agent.status()
+        assert status["soul"] == "base"
+
+    def test_soul_without_skcapstone(self, tmp_path: Path) -> None:
+        """Soul operations degrade gracefully without skcapstone."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+
+        with patch.dict(
+            "sys.modules",
+            {"skcapstone": None, "skcapstone.soul": None},
+        ):
+            # Force re-creation of soul manager
+            agent._soul_manager = None
+            assert agent.list_souls() == []
+            assert agent.active_soul() is None
+            assert agent.load_soul("test") is None
+
+
+# ---------------------------------------------------------------------------
+# Encryption stubs
+# ---------------------------------------------------------------------------
+
+
+class TestAgentCrypto:
+    """Tests for encrypt/decrypt/sign/verify — graceful degradation."""
+
+    def test_encrypt_without_capauth(self, tmp_path: Path) -> None:
+        """Encrypt returns None when capauth unavailable."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+
+        with patch.dict(
+            "sys.modules",
+            {"capauth": None, "capauth.crypto": None},
+        ):
+            result = agent.encrypt("secret", "A" * 40)
+            assert result is None
+
+    def test_decrypt_without_capauth(self, tmp_path: Path) -> None:
+        """Decrypt returns None when capauth unavailable."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+
+        with patch.dict(
+            "sys.modules",
+            {"capauth": None, "capauth.crypto": None},
+        ):
+            result = agent.decrypt("encrypted blob")
+            assert result is None
+
+    def test_sign_without_capauth(self, tmp_path: Path) -> None:
+        """Sign returns None when capauth unavailable."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+
+        with patch.dict(
+            "sys.modules",
+            {"capauth": None, "capauth.crypto": None},
+        ):
+            result = agent.sign("data to sign")
+            assert result is None
+
+    def test_verify_without_capauth(self, tmp_path: Path) -> None:
+        """Verify returns False when capauth unavailable."""
+        agent = Agent("TestBot", home=str(tmp_path / "agent"))
+        agent.init()
+
+        with patch.dict(
+            "sys.modules",
+            {"capauth": None, "capauth.crypto": None},
+        ):
+            result = agent.verify("data", "sig", "A" * 40)
+            assert result is False

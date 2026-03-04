@@ -18,7 +18,7 @@ Quick start:
     agent.send("peer@mesh", "Hello from the sovereign side!")
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "smilinTux Team"
 __license__ = "GPL-3.0-or-later"
 
