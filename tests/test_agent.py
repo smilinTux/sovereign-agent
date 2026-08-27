@@ -13,11 +13,112 @@ Covers:
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from types import ModuleType, SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
 from sksovereign_agent.agent import Agent
+
+
+@pytest.fixture(autouse=True)
+def optional_component_fixtures(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Provide deterministic doubles for capability-positive SDK tests.
+
+    The optional split packages are deliberately not runtime dependencies of
+    this package. Tests for graceful degradation replace these doubles with
+    missing modules explicitly.
+    """
+
+    class MemoryStore:
+        def __init__(self, primary: object) -> None:
+            self.memories: list[SimpleNamespace] = []
+
+        def snapshot(self, **values: object) -> SimpleNamespace:
+            values["emotional"] = values.get("emotional") or SimpleNamespace(intensity=0.0)
+            memory = SimpleNamespace(id=f"memory-{len(self.memories) + 1}", **values)
+            self.memories.append(memory)
+            return memory
+
+        def search(self, query: str, limit: int = 5) -> list[SimpleNamespace]:
+            query = query.lower()
+            return [m for m in self.memories if query in m.content.lower()][:limit]
+
+        def list_memories(self, limit: int = 1) -> list[SimpleNamespace]:
+            return self.memories[:limit]
+
+    class SQLiteBackend:
+        def __init__(self, base_path: str) -> None:
+            self.base_path = base_path
+
+    class EmotionalSnapshot:
+        def __init__(self, intensity: float) -> None:
+            self.intensity = intensity
+
+    class ChatMessage:
+        def __init__(self, **values: object) -> None:
+            self.__dict__.update(values)
+
+    class ChatHistory:
+        def __init__(self, store: MemoryStore) -> None:
+            self.messages: list[ChatMessage] = []
+
+        def store_message(self, message: ChatMessage) -> None:
+            self.messages.append(message)
+
+    class SoulManager:
+        def __init__(self, home: Path) -> None:
+            self.installed: dict[str, SimpleNamespace] = {}
+            self.active: str | None = None
+
+        def install(self, path: Path) -> SimpleNamespace:
+            if not path.exists():
+                raise FileNotFoundError(path)
+            values = dict(
+                line.split(":", 1) for line in path.read_text().splitlines() if ":" in line
+            )
+            blueprint = SimpleNamespace(
+                name=values["name"].strip(),
+                display_name=values.get("display_name", "").strip(),
+                category=values.get("category", "").strip(),
+                core_traits=[],
+            )
+            self.installed[blueprint.name] = blueprint
+            return blueprint
+
+        def list_installed(self) -> list[str]:
+            return sorted(self.installed)
+
+        def load(self, name: str, reason: str = "") -> SimpleNamespace:
+            if name not in self.installed:
+                raise ValueError(name)
+            self.active = name
+            return SimpleNamespace(model_dump=lambda: {"active_soul": name})
+
+        def unload(self, reason: str = "") -> SimpleNamespace:
+            self.active = None
+            return SimpleNamespace(model_dump=lambda: {"active_soul": None})
+
+        def get_active_soul_name(self) -> str | None:
+            return self.active
+
+    modules = {
+        "skmemory": ModuleType("skmemory"),
+        "skmemory.models": ModuleType("skmemory.models"),
+        "skchat": ModuleType("skchat"),
+        "skchat.models": ModuleType("skchat.models"),
+        "skchat.history": ModuleType("skchat.history"),
+        "skcapstone": ModuleType("skcapstone"),
+        "skcapstone.soul": ModuleType("skcapstone.soul"),
+    }
+    modules["skmemory"].MemoryStore = MemoryStore
+    modules["skmemory"].SQLiteBackend = SQLiteBackend
+    modules["skmemory.models"].EmotionalSnapshot = EmotionalSnapshot
+    modules["skchat.models"].ChatMessage = ChatMessage
+    modules["skchat.history"].ChatHistory = ChatHistory
+    modules["skcapstone.soul"].SoulManager = SoulManager
+    for name, module in modules.items():
+        monkeypatch.setitem(__import__("sys").modules, name, module)
 
 
 class TestAgentInit:
